@@ -23,6 +23,7 @@ $RECYCLE.BIN/
 *.spx
 *.gdb
 *.lock
+*.mxd
 
 # Windows shortcuts
 *.lnk
