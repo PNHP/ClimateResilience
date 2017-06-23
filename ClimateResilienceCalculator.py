@@ -15,17 +15,15 @@ import arcpy, os, datetime
 from arcpy import env
 from arcpy.sa import *
 
-# establish environmental settings
-arcpy.env.overwriteOutput = True
-arcpy.env.qualifiedFieldNames = False
-arcpy.env.workspace = r'W:\Conservation_Science\Science\ClimateChangeWPC\ClimateResilienceCalculator\PropertyResilienceOutput.gdb'
-
 # define parameters
 properties = arcpy.GetParameterAsText(0)
 climate = arcpy.GetParameterAsText(1)
 outGDB = arcpy.GetParameterAsText(2)
-# permanent location of template? can change if needed.
-template = r'W:\Conservation_Science\Science\ClimateChangeWPC\climateResilienceCalculator\ResilienceCalculator.gdb\GeophysicalSettings_Template'
+
+# establish environmental settings
+arcpy.env.overwriteOutput = True
+arcpy.env.qualifiedFieldNames = False
+arcpy.env.workspace = outGDB
 
 # dissolve selected properties with same name
 properties_dissolve = arcpy.Dissolve_management(properties, "properties_dissolve", "TRACT_NAME")
@@ -68,11 +66,25 @@ for name in tract_names:
                 row[0] = int(5*round(float(row[0]/5)))
                 cursor.updateRow(row)
 
-    # create copy of template
-    joinTable = arcpy.TableToTable_conversion(template, "in_memory", "joinTable")
+    # create template for join
+    template = arcpy.CreateTable_management(env.workspace, "template")
+    add_fields = ["Tier_Resilience", "Tier", "Resilience_Score"]
+    add_rows = [('10', 'Tier 1', '0. Developed'),('11', 'Tier 1', '1. Far Below Average (<-2 SD)'), ('12', 'Tier 1', '2. Below Average (-1 to -2 SD)'), ('13', 'Tier 1', '3. Slightly Below Average (-0.5 to -1 SD)'),
+                ('14', 'Tier 1', '4. Average (-0.5 to 0.5 SD)'), ('15', 'Tier 1', '5. Slightly Above Average (0.5 to 1 SD)'), ('16', 'Tier 1', '6. Above Average (1 SD to 2 SD)'), ('17', 'Tier 1', '7. Far Above Average (>2 SD)'),
+                ('20', 'Tier 2', '0. Developed'),('21', 'Tier 2', '1. Far Below Average (<-2 SD)'), ('22', 'Tier 2', '2. Below Average (-1 to -2 SD)'), ('23', 'Tier 2', '3. Slightly Below Average (-0.5 to -1 SD)'),
+                ('24', 'Tier 2', '4. Average (-0.5 to 0.5 SD)'), ('25', 'Tier 2', '5. Slightly Above Average (0.5 to 1 SD)'), ('26', 'Tier 2', '6. Above Average (1 SD to 2 SD)'), ('27', 'Tier 2', '7. Far Above Average (>2 SD)'),
+                ('30', 'Tier 3', '0. Developed'),('31', 'Tier 3', '1. Far Below Average (<-2 SD)'), ('32', 'Tier 3', '2. Below Average (-1 to -2 SD)'), ('33', 'Tier 3', '3. Slightly Below Average (-0.5 to -1 SD)'),
+                ('34', 'Tier 3', '4. Average (-0.5 to 0.5 SD)'), ('35', 'Tier 3', '5. Slightly Above Average (0.5 to 1 SD)'), ('36', 'Tier 3', '6. Above Average (1 SD to 2 SD)'), ('37', 'Tier 3', '7. Far Above Average (>2 SD)')]
+
+    for f in add_fields:
+        arcpy.AddField_management(template, f, "TEXT")
+
+    with arcpy.da.InsertCursor(template, add_fields) as cursor:
+        for row in add_rows:
+            cursor.insertRow(row)
 
     # join area field to template table
-    joinTable = arcpy.JoinField_management(joinTable, "Tier_Resilience", transpose, "Tier_Resilience", "Area")
+    joinTable = arcpy.JoinField_management(template, "Tier_Resilience", transpose, "Tier_Resilience", "Area")
 
     # fill null values with 0 and add % sign to all values
     with arcpy.da.UpdateCursor(joinTable, "Area") as cursor:
@@ -87,7 +99,7 @@ for name in tract_names:
     arcpy.PivotTable_management(joinTable, "Resilience_Score", "Tier", "Area", os.path.join(outGDB, n + "_" + "climate_resilience"))
 
 # delete temporary feature classes
-deleteFC = [os.path.join(env.workspace, "properties_dissolve"), os.path.join(env.workspace, "tab_area"), os.path.join(env.workspace, "transpose")]
+deleteFC = [os.path.join(env.workspace, "properties_dissolve"), os.path.join(env.workspace, "tab_area"), os.path.join(env.workspace, "transpose"), os.path.join(env.workspace, "template")]
 
 for FC in deleteFC:
     arcpy.Delete_management(FC)
