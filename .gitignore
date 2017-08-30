@@ -24,6 +24,7 @@ $RECYCLE.BIN/
 *.gdb
 *.lock
 *.mxd
+*.gdb
 
 # Windows shortcuts
 *.lnk
